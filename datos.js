@@ -2,10 +2,17 @@
 // Aquí vive TODO lo relacionado con guardar y leer datos.
 // Así, si más adelante cambian el almacenamiento del teléfono por una base
 // de datos en la nube, solo hay que modificar este archivo.
+//
+// Se guardan tres cosas en el teléfono:
+//   1. productos: el catálogo, con su precio de compra y de venta.
+//   2. días:      cuántas piezas de cada producto se registraron cada día.
+//   3. conteos:   lo que se contó con las manos, comparado contra lo registrado.
 
 const Datos = (function () {
-  // Nombre con el que se guardan los productos dentro del teléfono.
+  // Nombres con los que se guarda cada cosa dentro del teléfono.
   const CLAVE = 'combi_productos';
+  const CLAVE_DIAS = 'combi_dias';
+  const CLAVE_CONTEOS = 'combi_conteos_dia';
 
   // Catálogo inicial: los productos de la hoja de pedido.
   // Solo se carga la primera vez que se abre la app.
@@ -20,14 +27,46 @@ const Datos = (function () {
     'Rebanada', 'Queso', 'Pan G', 'Bolillo'
   ];
 
-  // Genera un identificador único para cada producto.
+  // Genera un identificador único para cada cosa que se guarda.
   function nuevoId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
-  // Crea un producto nuevo con sus datos en cero.
+  // Redondea a centavos, para que las sumas no arrastren decimales raros.
+  function aCentavos(numero) {
+    return Math.round(numero * 100) / 100;
+  }
+
+  // Lee un objeto guardado (como los días). Si no hay nada o está dañado, devuelve uno vacío.
+  function leerObjeto(clave) {
+    const texto = localStorage.getItem(clave);
+    if (texto === null) return {};
+    try {
+      const valor = JSON.parse(texto);
+      if (valor !== null && typeof valor === 'object' && !Array.isArray(valor)) return valor;
+      return {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  // Lee una lista guardada (como los conteos). Si no hay nada o está dañada, devuelve una vacía.
+  function leerLista(clave) {
+    const texto = localStorage.getItem(clave);
+    if (texto === null) return [];
+    try {
+      const valor = JSON.parse(texto);
+      return Array.isArray(valor) ? valor : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  // ---------- Productos ----------
+
+  // Crea un producto nuevo con sus precios en cero.
   function crearProducto(nombre) {
-    return { id: nuevoId(), nombre: nombre, precioCompra: 0, precioVenta: 0, existenciaMinima: 0 };
+    return { id: nuevoId(), nombre: nombre, precioCompra: 0, precioVenta: 0 };
   }
 
   // Guarda la lista completa de productos en el teléfono.
@@ -60,9 +99,9 @@ const Datos = (function () {
       return p.id !== producto.id && p.nombre.trim().toLowerCase() === nombre.toLowerCase();
     });
     if (repetido) return 'Ya existe un producto con ese nombre.';
-    const numeros = [producto.precioCompra, producto.precioVenta, producto.existenciaMinima];
-    if (numeros.some(function (n) { return typeof n !== 'number' || isNaN(n) || n < 0; })) {
-      return 'Los precios y la existencia mínima deben ser números de 0 en adelante.';
+    const precios = [producto.precioCompra, producto.precioVenta];
+    if (precios.some(function (n) { return typeof n !== 'number' || isNaN(n) || n < 0; })) {
+      return 'Los precios deben ser números de 0 en adelante.';
     }
     return '';
   }
@@ -85,26 +124,153 @@ const Datos = (function () {
     return '';
   }
 
-  // Elimina un producto por su id.
+  // Elimina un producto por su id, y también sus cantidades de todos los días.
   function eliminarProducto(id) {
     const lista = listar().filter(function (p) { return p.id !== id; });
     guardarLista(lista);
+
+    const dias = leerObjeto(CLAVE_DIAS);
+    Object.keys(dias).forEach(function (fecha) {
+      delete dias[fecha][id];
+      if (Object.keys(dias[fecha]).length === 0) delete dias[fecha];
+    });
+    localStorage.setItem(CLAVE_DIAS, JSON.stringify(dias));
   }
 
+  // ---------- Días: cantidades registradas ----------
+
+  // Revisa que la fecha tenga el formato AAAA-MM-DD y sea un día que existe.
+  function fechaValida(fecha) {
+    if (typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return false;
+    const partes = fecha.split('-').map(Number);
+    const d = new Date(partes[0], partes[1] - 1, partes[2]);
+    return d.getFullYear() === partes[0] && d.getMonth() === partes[1] - 1 && d.getDate() === partes[2];
+  }
+
+  // Devuelve las cantidades de un día, como { idDelProducto: piezas }.
+  function cantidadesDelDia(fecha) {
+    const dias = leerObjeto(CLAVE_DIAS);
+    return Object.assign({}, dias[fecha] || {});
+  }
+
+  // Anota cuántas piezas de un producto se registraron en un día.
+  // Con 0 se borra el registro de ese producto en ese día.
+  // Devuelve un mensaje de error, o '' si se guardó bien.
+  function guardarCantidad(fecha, productoId, cantidad) {
+    if (!fechaValida(fecha)) return 'La fecha no es válida.';
+    if (!Number.isInteger(cantidad) || cantidad < 0) {
+      return 'La cantidad debe ser un número entero de 0 en adelante.';
+    }
+    const existe = listar().some(function (p) { return p.id === productoId; });
+    if (!existe) return 'El producto no existe.';
+
+    const dias = leerObjeto(CLAVE_DIAS);
+    if (!dias[fecha]) dias[fecha] = {};
+    if (cantidad === 0) {
+      delete dias[fecha][productoId];
+      if (Object.keys(dias[fecha]).length === 0) delete dias[fecha];
+    } else {
+      dias[fecha][productoId] = cantidad;
+    }
+    localStorage.setItem(CLAVE_DIAS, JSON.stringify(dias));
+    return '';
+  }
+
+  // Suma lo de un día: piezas, costo, venta y ganancia (con los precios actuales).
+  function totalesDelDia(fecha) {
+    const cantidades = cantidadesDelDia(fecha);
+    const total = { piezas: 0, costo: 0, venta: 0, ganancia: 0 };
+    listar().forEach(function (producto) {
+      const cantidad = cantidades[producto.id] || 0;
+      if (cantidad <= 0) return;
+      total.piezas = total.piezas + cantidad;
+      total.costo = total.costo + cantidad * producto.precioCompra;
+      total.venta = total.venta + cantidad * producto.precioVenta;
+    });
+    total.costo = aCentavos(total.costo);
+    total.venta = aCentavos(total.venta);
+    total.ganancia = aCentavos(total.venta - total.costo);
+    return total;
+  }
+
+  // ---------- Conteos físicos y ajustes ----------
+
+  // Lee la lista de conteos guardados.
+  function listarConteos() {
+    return leerLista(CLAVE_CONTEOS);
+  }
+
+  // Anota lo que se contó con las manos de un producto en un día y lo compara con lo registrado.
+  // Devuelve { error: '...' } si algo falla, o { error: '', conteo: {...} } si todo salió bien.
+  function registrarConteo(fecha, productoId, contado) {
+    if (!fechaValida(fecha)) return { error: 'La fecha no es válida.' };
+    if (!Number.isInteger(contado) || contado < 0) {
+      return { error: 'El conteo debe ser un número entero de 0 en adelante.' };
+    }
+    const existe = listar().some(function (p) { return p.id === productoId; });
+    if (!existe) return { error: 'El producto no existe.' };
+
+    const registrado = cantidadesDelDia(fecha)[productoId] || 0;
+    const conteo = {
+      id: nuevoId(),
+      fecha: fecha,
+      productoId: productoId,
+      registrado: registrado,
+      contado: contado,
+      diferencia: contado - registrado,     // negativo = faltan piezas, positivo = sobran
+      ajustado: false,
+      creado: new Date().toISOString()
+    };
+    const conteos = listarConteos();
+    conteos.push(conteo);
+    localStorage.setItem(CLAVE_CONTEOS, JSON.stringify(conteos));
+    return { error: '', conteo: conteo };
+  }
+
+  // Corrige lo registrado ese día para que coincida con lo que se contó.
+  // Devuelve un mensaje de error, o '' si todo salió bien.
+  function ajustarAlConteo(conteoId) {
+    const conteos = listarConteos();
+    const conteo = conteos.find(function (c) { return c.id === conteoId; });
+    if (!conteo) return 'El conteo no existe.';
+    if (conteo.ajustado) return 'Este conteo ya se ajustó.';
+    if (conteo.diferencia === 0) return 'No hay diferencia que ajustar.';
+
+    const error = guardarCantidad(conteo.fecha, conteo.productoId, conteo.contado);
+    if (error !== '') return error;
+
+    conteo.ajustado = true;
+    localStorage.setItem(CLAVE_CONTEOS, JSON.stringify(conteos));
+    return '';
+  }
+
+  // ---------- Respaldo ----------
+
   // Devuelve el respaldo como texto (para guardarlo en un archivo).
-     function exportar() {
+  function exportar() {
     return JSON.stringify({
       app: 'combi',
-      version: 3,
+      version: 4,
       fecha: new Date().toISOString(),
       productos: listar(),
-      movimientos: listarMovimientos(),
+      dias: leerObjeto(CLAVE_DIAS),
       conteos: listarConteos()
     }, null, 2);
   }
 
+  // Revisa que los días tengan la forma { fecha: { idProducto: cantidad } }.
+  function diasValidos(dias) {
+    if (dias === null || typeof dias !== 'object' || Array.isArray(dias)) return false;
+    return Object.keys(dias).every(function (fecha) {
+      const dia = dias[fecha];
+      if (!fechaValida(fecha) || dia === null || typeof dia !== 'object' || Array.isArray(dia)) return false;
+      return Object.keys(dia).every(function (id) { return Number.isInteger(dia[id]) && dia[id] > 0; });
+    });
+  }
+
   // Restaura un respaldo. Lanza un error con mensaje claro si el archivo no sirve.
-    function importar(texto) {
+  // Los respaldos de versiones anteriores solo traen productos: en ese caso, no hay días ni conteos.
+  function importar(texto) {
     let datos;
     try {
       datos = JSON.parse(texto);
@@ -113,157 +279,36 @@ const Datos = (function () {
     }
     if (!datos || datos.app !== 'combi' || !Array.isArray(datos.productos)) {
       throw new Error('El archivo no es un respaldo de esta app.');
-    
-    // Los respaldos antiguos no traen movimientos ni conteos: en ese caso, listas vacías.
-    const movimientos = datos.movimientos === undefined ? [] : datos.movimientos;
-    const conteos = datos.conteos === undefined ? [] : datos.conteos;
-    if (!Array.isArray(movimientos) || !Array.isArray(conteos)) {
-      throw new Error('Los movimientos o conteos del respaldo no son válidos.');
     }
+    const esNuevo = datos.version >= 4;
+    const dias = esNuevo && datos.dias !== undefined ? datos.dias : {};
+    const conteos = esNuevo && datos.conteos !== undefined ? datos.conteos : [];
+    if (!diasValidos(dias) || !Array.isArray(conteos)) {
+      throw new Error('Los días o conteos del respaldo no son válidos.');
+    }
+    // Todo está revisado: ahora sí guardamos.
     guardarLista(datos.productos);
-    localStorage.setItem(CLAVE_MOVIMIENTOS, JSON.stringify(movimientos));
+    localStorage.setItem(CLAVE_DIAS, JSON.stringify(dias));
     localStorage.setItem(CLAVE_CONTEOS, JSON.stringify(conteos));
-    return { productos: datos.productos.length, movimientos: movimientos.length, conteos: conteos.length };
-  }
-       // Los respaldos antiguos (versión 1) no traen movimientos: en ese caso, lista vacía.
-    const movimientos = datos.movimientos === undefined ? [] : datos.movimientos;
-    if (!Array.isArray(movimientos)) {
-      throw new Error('Los movimientos del respaldo no son válidos.');
-    }
-    guardarLista(datos.productos);
-    localStorage.setItem(CLAVE_MOVIMIENTOS, JSON.stringify(movimientos));
-    return { productos: datos.productos.length, movimientos: movimientos.length };
-    }
-
-    // ---------- Movimientos (entradas, ventas y mermas) ----------
-  const CLAVE_MOVIMIENTOS = 'combi_movimientos';
-  const TIPOS = ['entrada', 'venta', 'merma'];
-
-  // Lee la lista de movimientos guardados. Si no hay ninguno, devuelve una lista vacía.
-  function listarMovimientos() {
-    const texto = localStorage.getItem(CLAVE_MOVIMIENTOS);
-    if (texto === null) return [];
-    try {
-      return JSON.parse(texto);
-    } catch (error) {
-      return [];
-    }
-  }
-
-  // Anota un movimiento. Devuelve un mensaje de error, o '' si se guardó bien.
-  function registrarMovimiento(productoId, tipo, cantidad) {
-    if (!TIPOS.includes(tipo)) return 'Tipo de movimiento no válido.';
-    if (!Number.isInteger(cantidad) || cantidad <= 0) {
-      return 'La cantidad debe ser un número entero mayor a 0.';
-    }
-    const existe = listar().some(function (p) { return p.id === productoId; });
-    if (!existe) return 'El producto no existe.';
-
-    const movimientos = listarMovimientos();
-    movimientos.push({
-      id: nuevoId(),
-      productoId: productoId,
-      tipo: tipo,
-      cantidad: cantidad,
-      fecha: new Date().toISOString()
-    });
-    localStorage.setItem(CLAVE_MOVIMIENTOS, JSON.stringify(movimientos));
-    return '';
-  }
-
-  // Calcula cuántas piezas hay de un producto: entradas menos ventas y mermas.
-  function existenciaDe(productoId) {
-    let total = 0;
-    listarMovimientos().forEach(function (m) {
-      if (m.productoId !== productoId) return;
-         if (m.tipo === 'entrada') {
-        total = total + m.cantidad;
-      } else if (m.tipo === 'ajuste') {
-        total = total + m.cantidad;      // un ajuste puede ser positivo o negativo
-      } else {
-        total = total - m.cantidad;
-      }
-    });
-    return total;
-  }
-    // ---------- Conteos físicos y ajustes ----------
-  const CLAVE_CONTEOS = 'combi_conteos';
-
-  // Lee la lista de conteos guardados. Si no hay ninguno, devuelve una lista vacía.
-  function listarConteos() {
-    const texto = localStorage.getItem(CLAVE_CONTEOS);
-    if (texto === null) return [];
-    try {
-      return JSON.parse(texto);
-    } catch (error) {
-      return [];
-    }
-  }
-
-  // Anota lo que se contó con las manos y lo compara con lo que la app esperaba.
-  // Devuelve { error: '...' } si algo falla, o { error: '', conteo: {...} } si todo salió bien.
-  function registrarConteo(productoId, contado) {
-    if (!Number.isInteger(contado) || contado < 0) {
-      return { error: 'El conteo debe ser un número entero de 0 en adelante.' };
-    }
-    const existe = listar().some(function (p) { return p.id === productoId; });
-    if (!existe) return { error: 'El producto no existe.' };
-
-    const esperado = existenciaDe(productoId);
-    const conteo = {
-      id: nuevoId(),
-      productoId: productoId,
-      fecha: new Date().toISOString(),
-      esperado: esperado,
-      contado: contado,
-      diferencia: contado - esperado,     // negativo = faltan piezas, positivo = sobran
-      ajustado: false
+    return {
+      productos: datos.productos.length,
+      dias: Object.keys(dias).length,
+      conteos: conteos.length
     };
-    const conteos = listarConteos();
-    conteos.push(conteo);
-    localStorage.setItem(CLAVE_CONTEOS, JSON.stringify(conteos));
-    return { error: '', conteo: conteo };
   }
 
-  // Corrige las existencias para que coincidan con un conteo.
-  // Lo hace anotando un movimiento de tipo 'ajuste'. Devuelve un mensaje de error, o '' si todo salió bien.
-  function ajustarAlConteo(conteoId) {
-    const conteos = listarConteos();
-    const conteo = conteos.find(function (c) { return c.id === conteoId; });
-    if (!conteo) return 'El conteo no existe.';
-    if (conteo.ajustado) return 'Este conteo ya se ajustó.';
-    if (conteo.diferencia === 0) return 'No hay diferencia que ajustar.';
-
-    const movimientos = listarMovimientos();
-    movimientos.push({
-      id: nuevoId(),
-      productoId: conteo.productoId,
-      tipo: 'ajuste',
-      cantidad: conteo.diferencia,
-      fecha: new Date().toISOString(),
-      conteoId: conteo.id
-    });
-    localStorage.setItem(CLAVE_MOVIMIENTOS, JSON.stringify(movimientos));
-
-    conteo.ajustado = true;
-    localStorage.setItem(CLAVE_CONTEOS, JSON.stringify(conteos));
-    return '';
-  }
-  
   // Lo que dejamos disponible para el resto de la app.
   return {
     listar: listar,
     guardarProducto: guardarProducto,
     eliminarProducto: eliminarProducto,
-    exportar: exportar,
-    importar: importar,
-    listarMovimientos: listarMovimientos,
-    registrarMovimiento: registrarMovimiento,
-    existenciaDe: existenciaDe,
-     listarConteos: listarConteos,
+    cantidadesDelDia: cantidadesDelDia,
+    guardarCantidad: guardarCantidad,
+    totalesDelDia: totalesDelDia,
+    listarConteos: listarConteos,
     registrarConteo: registrarConteo,
-    ajustarAlConteo: ajustarAlConteo
+    ajustarAlConteo: ajustarAlConteo,
+    exportar: exportar,
+    importar: importar
   };
-}
-)
- ();
+})();

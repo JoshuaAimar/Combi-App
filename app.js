@@ -7,6 +7,13 @@ const lista = document.getElementById('lista');
 const contador = document.getElementById('contador');
 const vacio = document.getElementById('vacio');
 const buscador = document.getElementById('buscador');
+const campoFecha = document.getElementById('campoFecha');
+const aviso = document.getElementById('aviso');
+
+const totPiezas = document.getElementById('totPiezas');
+const totCosto = document.getElementById('totCosto');
+const totVenta = document.getElementById('totVenta');
+const totGanancia = document.getElementById('totGanancia');
 
 const hoja = document.getElementById('hoja');
 const formulario = document.getElementById('formulario');
@@ -14,71 +21,146 @@ const tituloFormulario = document.getElementById('tituloFormulario');
 const campoNombre = document.getElementById('campoNombre');
 const campoCompra = document.getElementById('campoCompra');
 const campoVenta = document.getElementById('campoVenta');
-const campoMinima = document.getElementById('campoMinima');
 const mensajeError = document.getElementById('mensajeError');
 const btnEliminar = document.getElementById('btnEliminar');
 
 // Aquí recordamos qué producto se está editando (null = producto nuevo).
 let productoEnEdicion = null;
 
-// ---------- 2. Mostrar la lista ----------
+// ---------- 2. Utilidades ----------
+
+// Muestra un número como dinero: 1234.5 -> $1,234.50
 function dinero(numero) {
-  return '$' + Number(numero).toFixed(2);
+  return '$' + Number(numero).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Agrega un cero a la izquierda si hace falta: 5 -> '05'
+function dos(numero) {
+  return String(numero).padStart(2, '0');
+}
+
+// La fecha de hoy con el formato AAAA-MM-DD, según el reloj del teléfono.
+function hoy() {
+  const d = new Date();
+  return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate());
+}
+
+// '2026-10-20' -> '20/10/2026'
+function formatoFecha(fecha) {
+  const partes = fecha.split('-');
+  return partes[2] + '/' + partes[1] + '/' + partes[0];
+}
+
+// Escribe un número con su palabra en singular o plural: (1, 'día', 'días') -> '1 día'
+function plural(numero, singular, varios) {
+  return numero + ' ' + (numero === 1 ? singular : varios);
+}
+
+// Para ordenar los productos por nombre.
+function porNombre(a, b) {
+  return a.nombre.localeCompare(b.nombre, 'es');
+}
+
+// Muestra un aviso corto arriba y lo quita solo a los pocos segundos.
+let temporizadorAviso = null;
+function mostrarAviso(texto) {
+  aviso.textContent = texto;
+  aviso.hidden = false;
+  clearTimeout(temporizadorAviso);
+  temporizadorAviso = setTimeout(function () { aviso.hidden = true; }, 2800);
+}
+
+// ---------- 3. Mostrar la lista del día ----------
+
+// Actualiza la barra de abajo: piezas, costo, venta y ganancia del día elegido.
+function mostrarTotales() {
+  const total = Datos.totalesDelDia(campoFecha.value);
+  totPiezas.textContent = total.piezas;
+  totCosto.textContent = dinero(total.costo);
+  totVenta.textContent = dinero(total.venta);
+  totGanancia.textContent = dinero(total.ganancia);
+}
+
+// Guarda la cantidad que se escribió en una fila.
+function guardarCantidadDeFila(producto, fila, input) {
+  const texto = input.value;
+  const cantidad = texto === '' ? 0 : Number(texto);    // vacío = 0 piezas
+  const error = Datos.guardarCantidad(campoFecha.value, producto.id, cantidad);
+  if (error !== '') {
+    input.classList.add('invalido');                    // borde rojo: algo está mal
+    return;
+  }
+  input.classList.remove('invalido');
+  fila.classList.toggle('con-cantidad', cantidad > 0);  // se resalta si hay piezas
+  mostrarTotales();
 }
 
 function mostrarLista() {
+  const fecha = campoFecha.value;
   const texto = buscador.value.trim().toLowerCase();
   const todos = Datos.listar();
+  const cantidades = Datos.cantidadesDelDia(fecha);
 
   // Filtramos por lo que se escribió en el buscador y ordenamos por nombre.
   const productos = todos
     .filter(function (p) { return p.nombre.toLowerCase().includes(texto); })
-    .sort(function (a, b) { return a.nombre.localeCompare(b.nombre, 'es'); });
+    .sort(porNombre);
 
   lista.innerHTML = '';
   productos.forEach(function (producto) {
-    const fila = document.createElement('li');
+    const cantidad = cantidades[producto.id] || 0;
 
+    const fila = document.createElement('li');
+    if (cantidad > 0) fila.classList.add('con-cantidad');
+
+    // Lado izquierdo: nombre y precios. Al tocarlo se edita el producto.
     const info = document.createElement('div');
+    info.className = 'info';
     const nombre = document.createElement('div');
     nombre.className = 'nombre';
-    nombre.textContent = producto.nombre;           // textContent evita problemas con caracteres raros
+    nombre.textContent = producto.nombre;            // textContent evita problemas con caracteres raros
     const detalle = document.createElement('div');
     detalle.className = 'detalle';
     detalle.textContent = 'Compra ' + dinero(producto.precioCompra) +
-      ' · Venta ' + dinero(producto.precioVenta) +
-      ' · Ganancia ' + dinero(producto.precioVenta - producto.precioCompra) +
-      ' · Mínima ' + producto.existenciaMinima;
+      ' · Venta ' + dinero(producto.precioVenta);
     info.appendChild(nombre);
     info.appendChild(detalle);
+    info.addEventListener('click', function () { abrirFormulario(producto); });
 
-    const flecha = document.createElement('span');
-    flecha.className = 'flecha';
-    flecha.textContent = '›';
-
-    // Cuántas piezas hay: entradas menos ventas y mermas
-    const existencia = Datos.existenciaDe(producto.id);
-    const piezas = document.createElement('span');
-    piezas.className = 'existencia';
-    piezas.textContent = 'Hay ' + existencia;
-    if (existencia < producto.existenciaMinima) {
-      piezas.classList.add('bajo');      // se pinta en rojo
-    }
+    // Lado derecho: cuántas piezas se registraron ese día.
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.inputMode = 'numeric';
+    input.min = '0';
+    input.step = '1';
+    input.placeholder = '0';
+    input.value = cantidad > 0 ? cantidad : '';
+    input.setAttribute('aria-label', 'Piezas de ' + producto.nombre);
+    input.addEventListener('input', function () { guardarCantidadDeFila(producto, fila, input); });
 
     fila.appendChild(info);
-    fila.appendChild(piezas);
-    fila.appendChild(flecha);
-    fila.addEventListener('click', function () { abrirFormulario(producto); });
+    fila.appendChild(input);
     lista.appendChild(fila);
   });
 
-  contador.textContent = todos.length + (todos.length === 1 ? ' producto' : ' productos');
+  contador.textContent = plural(todos.length, 'producto', 'productos');
   vacio.hidden = productos.length > 0;
+  mostrarTotales();
 }
 
 buscador.addEventListener('input', mostrarLista);
 
-// ---------- 3. Formulario de agregar / editar ----------
+// Cambiar de día
+campoFecha.addEventListener('change', function () {
+  if (campoFecha.value === '') campoFecha.value = hoy();   // el día no puede quedar vacío
+  mostrarLista();
+});
+document.getElementById('btnHoy').addEventListener('click', function () {
+  campoFecha.value = hoy();
+  mostrarLista();
+});
+
+// ---------- 4. Formulario de agregar / editar producto ----------
 function abrirFormulario(producto) {
   productoEnEdicion = producto;                      // null si es nuevo
   mensajeError.hidden = true;
@@ -88,14 +170,12 @@ function abrirFormulario(producto) {
     campoNombre.value = '';
     campoCompra.value = 0;
     campoVenta.value = 0;
-    campoMinima.value = 0;
     btnEliminar.hidden = true;
   } else {
     tituloFormulario.textContent = 'Editar producto';
     campoNombre.value = producto.nombre;
     campoCompra.value = producto.precioCompra;
     campoVenta.value = producto.precioVenta;
-    campoMinima.value = producto.existenciaMinima;
     btnEliminar.hidden = false;
   }
   hoja.hidden = false;
@@ -117,8 +197,7 @@ formulario.addEventListener('submit', function (evento) {
     id: productoEnEdicion ? productoEnEdicion.id : '',
     nombre: campoNombre.value,
     precioCompra: parseFloat(campoCompra.value),
-    precioVenta: parseFloat(campoVenta.value),
-    existenciaMinima: parseInt(campoMinima.value, 10)
+    precioVenta: parseFloat(campoVenta.value)
   };
 
   const error = Datos.guardarProducto(producto);
@@ -136,14 +215,45 @@ formulario.addEventListener('input', function () { mensajeError.hidden = true; }
 
 btnEliminar.addEventListener('click', function () {
   if (productoEnEdicion === null) return;
-  if (confirm('¿Eliminar "' + productoEnEdicion.nombre + '"?')) {
+  if (confirm('¿Eliminar "' + productoEnEdicion.nombre + '"? También se borrarán sus cantidades de todos los días.')) {
     Datos.eliminarProducto(productoEnEdicion.id);
     cerrarFormulario();
     mostrarLista();
   }
 });
 
-// ---------- 4. Respaldo ----------
+// ---------- 5. Copiar el pedido del día ----------
+// Arma el texto con lo registrado ese día y lo copia, para pegarlo en WhatsApp.
+document.getElementById('btnCopiar').addEventListener('click', function () {
+  const fecha = campoFecha.value;
+  const cantidades = Datos.cantidadesDelDia(fecha);
+
+  const lineas = Datos.listar()
+    .filter(function (p) { return cantidades[p.id] > 0; })
+    .sort(porNombre)
+    .map(function (p) { return cantidades[p.id] + ' ' + p.nombre; });
+
+  if (lineas.length === 0) {
+    mostrarAviso('No hay piezas registradas este día.');
+    return;
+  }
+
+  const total = Datos.totalesDelDia(fecha).piezas;
+  const texto = 'Pedido Expendio La Combi (' + formatoFecha(fecha) + ')\n' +
+    lineas.join('\n') + '\nTotal: ' + total + ' piezas';
+
+  if (!navigator.clipboard) {
+    alert('No se pudo copiar. Este es el pedido:\n\n' + texto);
+    return;
+  }
+  navigator.clipboard.writeText(texto).then(function () {
+    mostrarAviso('Pedido copiado (' + plural(lineas.length, 'producto', 'productos') + '). Pégalo en WhatsApp.');
+  }).catch(function () {
+    alert('No se pudo copiar. Este es el pedido:\n\n' + texto);
+  });
+});
+
+// ---------- 6. Respaldo ----------
 document.getElementById('btnExportar').addEventListener('click', function () {
   const contenido = Datos.exportar();
   const archivo = new Blob([contenido], { type: 'application/json' });
@@ -162,7 +272,7 @@ document.getElementById('btnImportar').addEventListener('click', function () { a
 archivoRespaldo.addEventListener('change', function () {
   const archivo = archivoRespaldo.files[0];
   if (!archivo) return;
-  if (!confirm('Esto reemplazará los productos y movimientos actuales por los del respaldo. ¿Continuar?')) {
+  if (!confirm('Esto reemplazará los productos, días y conteos actuales por los del respaldo. ¿Continuar?')) {
     archivoRespaldo.value = '';
     return;
   }
@@ -171,7 +281,8 @@ archivoRespaldo.addEventListener('change', function () {
     try {
       const resumen = Datos.importar(lector.result);
       mostrarLista();
-      alert('Respaldo restaurado: ' + resumen.productos + ' productos, ' + resumen.movimientos + ' movimientos y ' + resumen.conteos + ' conteos.');
+      alert('Respaldo restaurado: ' + plural(resumen.productos, 'producto', 'productos') + ', ' +
+        plural(resumen.dias, 'día', 'días') + ' y ' + plural(resumen.conteos, 'conteo', 'conteos') + '.');
     } catch (error) {
       alert(error.message);
     }
@@ -180,96 +291,20 @@ archivoRespaldo.addEventListener('change', function () {
   lector.readAsText(archivo);
 });
 
-// ---------- 5. Service worker (hace que funcione sin internet) ----------
-// Mientras programamos (localhost) lo desactivamos para ver los cambios al instante.
-const enDesarrollo = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-
-if ('serviceWorker' in navigator) {
-  if (enDesarrollo) {
-    navigator.serviceWorker.getRegistrations().then(function (registros) {
-      registros.forEach(function (registro) { registro.unregister(); });
-    });
-  } else {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js');
-    });
-  }
-}
-
-// ---------- 6. Registrar movimientos (entradas, ventas y mermas) ----------
-const hojaMov = document.getElementById('hojaMov');
-const formMov = document.getElementById('formMov');
-const movProducto = document.getElementById('movProducto');
-const movCantidad = document.getElementById('movCantidad');
-const movMensaje = document.getElementById('movMensaje');
-const movError = document.getElementById('movError');
-
-// Llena la lista desplegable con los productos, en orden alfabético.
-function llenarProductos() {
-  const productos = Datos.listar().sort(function (a, b) {
-    return a.nombre.localeCompare(b.nombre, 'es');
-  });
-  movProducto.innerHTML = '';
-  productos.forEach(function (producto) {
-    const opcion = document.createElement('option');
-    opcion.value = producto.id;
-    opcion.textContent = producto.nombre;
-    movProducto.appendChild(opcion);
-  });
-}
-
-function abrirMovimiento() {
-  llenarProductos();
-  movCantidad.value = '';
-  movMensaje.hidden = true;
-  movError.hidden = true;
-  hojaMov.hidden = false;
-}
-
-function cerrarMovimiento() {
-  hojaMov.hidden = true;
-  mostrarLista();                 // actualiza los "Hay ..." de la lista
-}
-
-document.getElementById('btnMovimiento').addEventListener('click', abrirMovimiento);
-document.getElementById('btnCerrarMov').addEventListener('click', cerrarMovimiento);
-
-formMov.addEventListener('submit', function (evento) {
-  evento.preventDefault();
-  movMensaje.hidden = true;
-  movError.hidden = true;
-
-  const tipo = formMov.elements['movTipo'].value;      // 'entrada', 'venta' o 'merma'
-  const cantidad = Number(movCantidad.value);          // Number no recorta decimales en silencio
-  const error = Datos.registrarMovimiento(movProducto.value, tipo, cantidad);
-
-  if (error !== '') {
-    movError.textContent = error;
-    movError.hidden = false;
-    return;
-  }
-
-  const nombre = movProducto.options[movProducto.selectedIndex].text;
-  movMensaje.textContent = 'Guardado: ' + tipo + ' de ' + cantidad + ' · ' + nombre +
-    ' (ahora hay ' + Datos.existenciaDe(movProducto.value) + ')';
-  movMensaje.hidden = false;
-  movCantidad.value = '';
-  movCantidad.focus();
-});
-
-// Si la persona vuelve a escribir, ocultamos el error anterior.
-formMov.addEventListener('input', function () { movError.hidden = true; });
-
-// ---------- 6b. Conteo físico ----------
+// ---------- 7. Conteo físico ----------
 const hojaConteo = document.getElementById('hojaConteo');
 const listaConteo = document.getElementById('listaConteo');
+const ayudaConteo = document.getElementById('ayudaConteo');
+const resultadoConteo = document.getElementById('resultadoConteo');
 const conteoMensaje = document.getElementById('conteoMensaje');
 const conteoError = document.getElementById('conteoError');
 
-// Aquí recordamos cada fila de la pantalla: su producto, lo esperado, su cuadro y su aviso.
+// Aquí recordamos cada fila de la pantalla: su producto, lo registrado, su cuadro y su aviso.
 let filasConteo = [];
+// El día al que pertenece el conteo que se está haciendo.
+let fechaConteo = '';
 
-// Muestra la diferencia entre lo contado y lo esperado, en esa fila.
+// Muestra la diferencia entre lo contado y lo registrado, en esa fila.
 function mostrarDiferencia(fila) {
   const texto = fila.input.value;
   if (texto === '') {
@@ -283,7 +318,7 @@ function mostrarDiferencia(fila) {
     fila.dif.className = 'dif mal';
     return;
   }
-  const diferencia = contado - fila.esperado;
+  const diferencia = contado - fila.registrado;
   if (diferencia === 0) {
     fila.dif.textContent = 'Coincide';
     fila.dif.className = 'dif ok';
@@ -294,18 +329,21 @@ function mostrarDiferencia(fila) {
 }
 
 function abrirConteo() {
+  fechaConteo = campoFecha.value;
   resultadoConteo.hidden = true;
   conteoMensaje.hidden = true;
   conteoError.hidden = true;
   listaConteo.innerHTML = '';
   filasConteo = [];
 
-  const productos = Datos.listar().sort(function (a, b) {
-    return a.nombre.localeCompare(b.nombre, 'es');
-  });
+  ayudaConteo.textContent = 'Día ' + formatoFecha(fechaConteo) + '. Cuenta las piezas que hay y escríbelas. ' +
+    'La app te muestra la diferencia contra lo registrado ese día. Deja en blanco lo que no cuentes.';
+
+  const registrados = Datos.cantidadesDelDia(fechaConteo);
+  const productos = Datos.listar().sort(porNombre);
 
   productos.forEach(function (producto) {
-    const esperado = Datos.existenciaDe(producto.id);
+    const registrado = registrados[producto.id] || 0;
 
     const li = document.createElement('li');
     li.className = 'fila-conteo';
@@ -315,13 +353,13 @@ function abrirConteo() {
     const nombre = document.createElement('div');
     nombre.className = 'nombre';
     nombre.textContent = producto.nombre;
-    const textoEsperado = document.createElement('div');
-    textoEsperado.className = 'esperado';
-    textoEsperado.textContent = 'Esperado: ' + esperado;
+    const textoRegistrado = document.createElement('div');
+    textoRegistrado.className = 'registrado';
+    textoRegistrado.textContent = 'Registrado: ' + registrado;
     const dif = document.createElement('div');
     dif.className = 'dif';
     datos.appendChild(nombre);
-    datos.appendChild(textoEsperado);
+    datos.appendChild(textoRegistrado);
     datos.appendChild(dif);
 
     const input = document.createElement('input');
@@ -335,7 +373,7 @@ function abrirConteo() {
     li.appendChild(input);
     listaConteo.appendChild(li);
 
-    const fila = { producto: producto, esperado: esperado, textoEsperado: textoEsperado, input: input, dif: dif };
+    const fila = { producto: producto, registrado: registrado, textoRegistrado: textoRegistrado, input: input, dif: dif };
     input.addEventListener('input', function () {
       conteoError.hidden = true;
       mostrarDiferencia(fila);
@@ -346,9 +384,7 @@ function abrirConteo() {
   hojaConteo.hidden = false;
 }
 
-const resultadoConteo = document.getElementById('resultadoConteo');
-
-// Ajusta la existencia de un producto al conteo. Devuelve true si se pudo.
+// Corrige lo registrado de un producto para que coincida con el conteo. Devuelve true si se pudo.
 function ajustarUno(item, boton) {
   const error = Datos.ajustarAlConteo(item.conteo.id);
   if (error !== '') {
@@ -357,9 +393,9 @@ function ajustarUno(item, boton) {
   }
   boton.textContent = 'Ajustado ✓';
   boton.disabled = true;
-  // La existencia cambió, así que actualizamos el "Esperado" de esa fila.
-  item.fila.esperado = Datos.existenciaDe(item.fila.producto.id);
-  item.fila.textoEsperado.textContent = 'Esperado: ' + item.fila.esperado;
+  // Lo registrado cambió, así que actualizamos el "Registrado" de esa fila.
+  item.fila.registrado = Datos.cantidadesDelDia(fechaConteo)[item.fila.producto.id] || 0;
+  item.fila.textoRegistrado.textContent = 'Registrado: ' + item.fila.registrado;
   return true;
 }
 
@@ -387,8 +423,8 @@ function mostrarResultado(items) {
     nombre.className = 'nombre';
     nombre.textContent = item.fila.producto.nombre;
     const detalle = document.createElement('div');
-    detalle.className = 'detalle';
-    detalle.textContent = 'Esperado ' + c.esperado + ' · Contado ' + c.contado +
+    detalle.className = 'detalle-resultado';
+    detalle.textContent = 'Registrado ' + c.registrado + ' · Contado ' + c.contado +
       ' · Diferencia ' + (c.diferencia > 0 ? '+' : '') + c.diferencia;
     datos.appendChild(nombre);
     datos.appendChild(detalle);
@@ -422,7 +458,7 @@ function mostrarResultado(items) {
 
 function cerrarConteo() {
   hojaConteo.hidden = true;
-  mostrarLista();
+  mostrarLista();                      // actualiza las cantidades y los totales
 }
 
 document.getElementById('btnConteo').addEventListener('click', abrirConteo);
@@ -455,7 +491,7 @@ document.getElementById('btnGuardarConteo').addEventListener('click', function (
   // Ahora sí, guardamos cada conteo.
   const conDiferencia = [];          // aquí juntamos los que no coinciden
   contadas.forEach(function (f) {
-    const resultado = Datos.registrarConteo(f.producto.id, Number(f.input.value));
+    const resultado = Datos.registrarConteo(fechaConteo, f.producto.id, Number(f.input.value));
     if (resultado.conteo.diferencia !== 0) {
       conDiferencia.push({ fila: f, conteo: resultado.conteo });
     }
@@ -465,99 +501,28 @@ document.getElementById('btnGuardarConteo').addEventListener('click', function (
 
   // Precisión: de todo lo que se contó, ¿qué porcentaje coincidió?
   const precision = Math.round((contadas.length - conDiferencia.length) / contadas.length * 100);
-  conteoMensaje.textContent = 'Se guardaron ' + contadas.length + ' conteos, ' + conDiferencia.length +
-    ' con diferencia. Precisión: ' + precision + ' %.';  mostrarResultado(conDiferencia);
+  conteoMensaje.textContent = 'Se guardaron ' + plural(contadas.length, 'conteo', 'conteos') + ', ' + conDiferencia.length +
+    ' con diferencia. Precisión: ' + precision + ' %.';
+  conteoMensaje.hidden = false;
+  mostrarResultado(conDiferencia);
 });
 
-// ---------- 6c. Pedido sugerido ----------
-const hojaPedido = document.getElementById('hojaPedido');
-const listaPedido = document.getElementById('listaPedido');
-const pedidoVacio = document.getElementById('pedidoVacio');
-const pedidoMensaje = document.getElementById('pedidoMensaje');
+// ---------- 8. Service worker (hace que funcione sin internet) ----------
+// Mientras programamos (localhost) lo desactivamos para ver los cambios al instante.
+const enDesarrollo = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
-// Aquí recordamos cada fila del pedido: su producto y su cuadro con la cantidad.
-let filasPedido = [];
-
-function abrirPedido() {
-  pedidoMensaje.hidden = true;
-  listaPedido.innerHTML = '';
-  filasPedido = [];
-
-  const productos = Datos.listar().sort(function (a, b) {
-    return a.nombre.localeCompare(b.nombre, 'es');
-  });
-
-  productos.forEach(function (producto) {
-    // Si la existencia salió negativa (se vendió más de lo anotado), contamos 0.
-    const hay = Math.max(Datos.existenciaDe(producto.id), 0);
-    const falta = producto.existenciaMinima - hay;
-    if (falta <= 0) return;                      // este producto no hace falta pedirlo
-
-    const li = document.createElement('li');
-    li.className = 'fila-conteo';
-
-    const datos = document.createElement('div');
-    datos.className = 'datos';
-    const nombre = document.createElement('div');
-    nombre.className = 'nombre';
-    nombre.textContent = producto.nombre;
-    const detalle = document.createElement('div');
-    detalle.className = 'esperado';
-    detalle.textContent = 'Hay ' + hay + ' · Mínima ' + producto.existenciaMinima;
-    datos.appendChild(nombre);
-    datos.appendChild(detalle);
-
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.inputMode = 'numeric';
-    input.min = '0';
-    input.step = '1';
-    input.value = falta;                         // la cantidad sugerida
-
-    li.appendChild(datos);
-    li.appendChild(input);
-    listaPedido.appendChild(li);
-    filasPedido.push({ producto: producto, input: input });
-  });
-
-  pedidoVacio.hidden = filasPedido.length > 0;
-  hojaPedido.hidden = false;
+if ('serviceWorker' in navigator) {
+  if (enDesarrollo) {
+    navigator.serviceWorker.getRegistrations().then(function (registros) {
+      registros.forEach(function (registro) { registro.unregister(); });
+    });
+  } else {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js');
+    });
+  }
 }
 
-document.getElementById('btnPedido').addEventListener('click', abrirPedido);
-document.getElementById('btnCerrarPedido').addEventListener('click', function () {
-  hojaPedido.hidden = true;
-});
-
-// Arma el texto del pedido y lo copia, para pegarlo en WhatsApp.
-document.getElementById('btnCopiarPedido').addEventListener('click', function () {
-  const lineas = [];
-  filasPedido.forEach(function (f) {
-    const cantidad = Number(f.input.value);
-    if (Number.isInteger(cantidad) && cantidad > 0) {
-      lineas.push(cantidad + ' ' + f.producto.nombre);
-    }
-  });
-
-  if (lineas.length === 0) {
-    pedidoMensaje.textContent = 'No hay nada que pedir.';
-    pedidoMensaje.hidden = false;
-    return;
-  }
-
-  const texto = 'Pedido Expendio La Combi (' + new Date().toLocaleDateString('es-MX') + ')\n' + lineas.join('\n');
-
-  if (!navigator.clipboard) {
-    alert('No se pudo copiar. Este es el pedido:\n\n' + texto);
-    return;
-  }
-  navigator.clipboard.writeText(texto).then(function () {
-    pedidoMensaje.textContent = 'Pedido copiado (' + lineas.length + ' productos). Pégalo en WhatsApp.';
-    pedidoMensaje.hidden = false;
-  }).catch(function () {
-    alert('No se pudo copiar. Este es el pedido:\n\n' + texto);
-  });
-});
-
-// ---------- 7. Arranque ----------
+// ---------- 9. Arranque ----------
+campoFecha.value = hoy();
 mostrarLista();

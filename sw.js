@@ -3,7 +3,7 @@
 // IMPORTANTE: cada vez que cambien un archivo de la app, cambien también
 // el número de VERSION para que el teléfono descargue la versión nueva.
 
-const VERSION = 'combi-v2';
+const VERSION = 'combi-v4';
 const ARCHIVOS = [
   './',
   'index.html',

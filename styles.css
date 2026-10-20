@@ -1,13 +1,15 @@
 /* styles.css — el aspecto de la app. Pensado para pantalla de celular. */
 
 :root {
-  --naranja: #6d3622;
+  --naranja: #6d3622;          /* café de la combi */
   --naranja-oscuro: #4a2314;
+  --amarillo: #f3bd1b;         /* amarillo de la combi */
   --fondo: #f7efdc;
   --texto: #2b2118;
   --gris: #6f655b;
   --borde: #e4dbd0;
   --rojo: #b3261e;
+  --verde: #1e6b34;
 }
 
 * { box-sizing: border-box; }
@@ -18,9 +20,11 @@ body {
   font-size: 17px;
   color: var(--texto);
   background: var(--fondo);
-  /* Deja espacio para la muesca y la barra inferior del iPhone */
-  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  /* Deja espacio para la barra de totales y la barra inferior del iPhone */
+  padding-bottom: calc(170px + env(safe-area-inset-bottom));
 }
+
+[hidden] { display: none !important; }
 
 /* ---------- Encabezado ---------- */
 .encabezado {
@@ -31,8 +35,55 @@ body {
   color: #fff;
   padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
 }
-.encabezado h1 { margin: 0; font-size: 22px; }
-.subtitulo { margin: 0 0 10px; opacity: .9; font-size: 14px; }
+.encabezado h1 { margin: 0 0 10px; font-size: 22px; }
+
+.logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  vertical-align: middle;
+  margin-right: 10px;
+}
+
+.botones-encabezado {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 16px;
+  display: flex;
+  gap: 8px;
+}
+.boton-encabezado {
+  padding: 10px 16px;
+  border: 2px solid var(--amarillo);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--amarillo);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.fila-fecha { display: flex; gap: 8px; margin-bottom: 8px; }
+.fila-fecha input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 12px;
+  font-size: 17px;
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--texto);
+}
+.boton-hoy {
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--amarillo);
+  color: var(--naranja);
+  font-size: 16px;
+  font-weight: 700;
+}
+
 #buscador {
   width: 100%;
   padding: 12px;
@@ -44,24 +95,33 @@ body {
 main { padding: 12px 16px; }
 .contador { color: var(--gris); font-size: 14px; margin: 4px 0 10px; }
 
-/* ---------- Lista ---------- */
+/* ---------- Lista de productos del día ---------- */
 .lista { list-style: none; margin: 0; padding: 0; }
 .lista li {
   background: #fff;
   border: 1px solid var(--borde);
   border-radius: 12px;
-  padding: 14px;
+  padding: 12px 14px;
   margin-bottom: 10px;
-  min-height: 56px;            /* fácil de tocar con el dedo */
+  min-height: 62px;            /* fácil de tocar con el dedo */
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  cursor: pointer;
+  gap: 12px;
 }
-.lista li:active { background: #f3ebe1; }
+.lista li.con-cantidad { border-color: var(--amarillo); background: #fffaf0; }
+.lista .info { flex: 1; min-width: 0; cursor: pointer; }
+.lista .info:active { opacity: .6; }
 .nombre { font-weight: 600; }
 .detalle { color: var(--gris); font-size: 14px; margin-top: 2px; }
-.flecha { color: var(--gris); font-size: 22px; }
+.lista input {
+  width: 84px;
+  padding: 12px;
+  font-size: 18px;
+  text-align: center;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+.lista input.invalido { border-color: var(--rojo); background: #fdecea; }
 .vacio { text-align: center; color: var(--gris); }
 
 /* ---------- Respaldo ---------- */
@@ -94,7 +154,7 @@ main { padding: 12px 16px; }
 .flotante {
   position: fixed;
   right: 18px;
-  bottom: calc(20px + env(safe-area-inset-bottom));
+  bottom: calc(86px + env(safe-area-inset-bottom));   /* arriba de la barra de totales */
   width: 62px;
   height: 62px;
   border-radius: 50%;
@@ -106,7 +166,41 @@ main { padding: 12px 16px; }
   box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
 }
 
-/* ---------- Formulario ---------- */
+/* ---------- Barra de totales ---------- */
+.barra-totales {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  background: var(--naranja);
+  color: #fff;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, .25);
+}
+.total { flex: 1; display: flex; flex-direction: column; text-align: center; }
+.total-titulo { font-size: 12px; opacity: .85; }
+.total-valor { font-size: 16px; font-weight: 700; }
+
+/* ---------- Aviso breve ---------- */
+.aviso {
+  position: fixed;
+  left: 50%;
+  top: calc(70px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: 90%;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: #2b2118;
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+}
+
+/* ---------- Pantallas que cubren todo (formulario y conteo) ---------- */
 .hoja {
   position: fixed;
   inset: 0;
@@ -114,7 +208,6 @@ main { padding: 12px 16px; }
   background: var(--fondo);
   overflow-y: auto;
 }
-.hoja[hidden] { display: none; }
 .formulario {
   padding: calc(20px + env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom));
 }
@@ -129,95 +222,10 @@ main { padding: 12px 16px; }
   background: #fff;
 }
 .error { color: var(--rojo); font-weight: 600; }
+.mensaje { color: var(--verde); font-weight: 600; }
 .acciones { margin-top: 22px; }
 
-[hidden] { display: none !important; }
-
-/* Logo del encabezado */
-.logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  vertical-align: middle;
-  margin-right: 10px;
-}
-
-/* Piezas que hay de cada producto */
-.existencia {
-  font-weight: 700;
-  margin: 0 12px;
-  white-space: nowrap;
-}
-.existencia.bajo { color: var(--rojo); }
-
-/* Que el texto del producto ocupe el espacio libre y empuje "Hay" y la flecha a la derecha */
-.lista li > div { flex: 1; }
-
-/* ---------- Pantalla de movimientos ---------- */
-.flotante-mov {
-  position: fixed;
-  left: 18px;
-  bottom: calc(20px + env(safe-area-inset-bottom));
-  height: 62px;
-  padding: 0 24px;
-  border: none;
-  border-radius: 31px;
-  background: #f3bd1b;          /* amarillo de la combi */
-  color: #6d3622;               /* café de la combi */
-  font-size: 17px;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
-}
-
-.formulario select {
-  width: 100%;
-  padding: 13px;
-  font-size: 17px;
-  border: 1px solid var(--borde);
-  border-radius: 10px;
-  background: #fff;
-}
-
-/* Los tres botones Entrada / Venta / Merma */
-.tipos { display: flex; gap: 8px; }
-.formulario .tipo { flex: 1; margin: 0; }
-.formulario .tipo input {         /* escondemos el circulito de radio */
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.tipo span {
-  display: block;
-  text-align: center;
-  padding: 14px 4px;
-  border: 2px solid var(--naranja);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--naranja);
-  font-weight: 600;
-}
-.tipo input:checked + span {      /* el que está elegido se rellena */
-  background: var(--naranja);
-  color: #fff;
-}
-
-.mensaje { color: #1e6b34; font-weight: 600; }
-
 /* ---------- Pantalla de conteo ---------- */
-.boton-encabezado {
-  position: absolute;
-  top: calc(14px + env(safe-area-inset-top));
-  right: 16px;
-  padding: 10px 16px;
-  border: 2px solid #f3bd1b;
-  border-radius: 10px;
-  background: transparent;
-  color: #f3bd1b;
-  font-size: 16px;
-  font-weight: 700;
-}
-
 .conteo { padding: calc(20px + env(safe-area-inset-top)) 16px 0; }
 .conteo h2 { margin-top: 0; }
 .ayuda { color: var(--gris); font-size: 14px; }
@@ -235,8 +243,7 @@ main { padding: 12px 16px; }
   margin-bottom: 8px;
 }
 .fila-conteo .datos { flex: 1; }
-.fila-conteo .nombre { font-weight: 600; }
-.fila-conteo .esperado { color: var(--gris); font-size: 14px; }
+.fila-conteo .registrado { color: var(--gris); font-size: 14px; }
 .fila-conteo input {
   width: 84px;
   padding: 12px;
@@ -246,7 +253,7 @@ main { padding: 12px 16px; }
   border-radius: 10px;
 }
 .dif { font-size: 14px; font-weight: 700; min-height: 18px; }
-.dif.ok { color: #1e6b34; }
+.dif.ok { color: var(--verde); }
 .dif.mal { color: var(--rojo); }
 
 /* Barra con los botones, siempre visible abajo */
@@ -277,8 +284,7 @@ main { padding: 12px 16px; }
   border-top: 1px solid var(--borde);
 }
 .fila-resultado .datos { flex: 1; }
-.fila-resultado .nombre { font-weight: 600; }
-.fila-resultado .detalle { color: var(--gris); font-size: 14px; }
+.fila-resultado .detalle-resultado { color: var(--gris); font-size: 14px; }
 .boton-ajustar {
   padding: 10px 14px;
   border: 2px solid var(--naranja);
@@ -289,18 +295,8 @@ main { padding: 12px 16px; }
   font-weight: 700;
 }
 .boton-ajustar:disabled {
-  border-color: #1e6b34;
-  color: #1e6b34;
+  border-color: var(--verde);
+  color: var(--verde);
   background: #eef7f0;
 }
 .resultado .boton { margin: 12px 0 0; }
-
-/* ---------- Botones del encabezado (Pedido y Conteo) ---------- */
-.botones-encabezado {
-  position: absolute;
-  top: calc(14px + env(safe-area-inset-top));
-  right: 16px;
-  display: flex;
-  gap: 8px;
-}
-.botones-encabezado .boton-encabezado { position: static; }
