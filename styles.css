@@ -1,0 +1,306 @@
+/* styles.css — el aspecto de la app. Pensado para pantalla de celular. */
+
+:root {
+  --naranja: #6d3622;
+  --naranja-oscuro: #4a2314;
+  --fondo: #f7efdc;
+  --texto: #2b2118;
+  --gris: #6f655b;
+  --borde: #e4dbd0;
+  --rojo: #b3261e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-size: 17px;
+  color: var(--texto);
+  background: var(--fondo);
+  /* Deja espacio para la muesca y la barra inferior del iPhone */
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+}
+
+/* ---------- Encabezado ---------- */
+.encabezado {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--naranja);
+  color: #fff;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+}
+.encabezado h1 { margin: 0; font-size: 22px; }
+.subtitulo { margin: 0 0 10px; opacity: .9; font-size: 14px; }
+#buscador {
+  width: 100%;
+  padding: 12px;
+  font-size: 17px;
+  border: none;
+  border-radius: 10px;
+}
+
+main { padding: 12px 16px; }
+.contador { color: var(--gris); font-size: 14px; margin: 4px 0 10px; }
+
+/* ---------- Lista ---------- */
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li {
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  min-height: 56px;            /* fácil de tocar con el dedo */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+.lista li:active { background: #f3ebe1; }
+.nombre { font-weight: 600; }
+.detalle { color: var(--gris); font-size: 14px; margin-top: 2px; }
+.flecha { color: var(--gris); font-size: 22px; }
+.vacio { text-align: center; color: var(--gris); }
+
+/* ---------- Respaldo ---------- */
+.respaldo {
+  margin-top: 28px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+}
+.respaldo h2 { margin: 0 0 6px; font-size: 18px; }
+.respaldo p { color: var(--gris); font-size: 14px; margin: 0 0 12px; }
+
+/* ---------- Botones ---------- */
+.boton {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 10px;
+  font-size: 17px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 2px solid transparent;
+}
+.principal { background: var(--naranja); color: #fff; }
+.principal:active { background: var(--naranja-oscuro); }
+.secundario { background: #fff; color: var(--naranja); border-color: var(--naranja); }
+.peligro { background: #fff; color: var(--rojo); border-color: var(--rojo); }
+
+.flotante {
+  position: fixed;
+  right: 18px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: none;
+  background: var(--naranja);
+  color: #fff;
+  font-size: 36px;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+}
+
+/* ---------- Formulario ---------- */
+.hoja {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: var(--fondo);
+  overflow-y: auto;
+}
+.hoja[hidden] { display: none; }
+.formulario {
+  padding: calc(20px + env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom));
+}
+.formulario h2 { margin-top: 0; }
+.formulario label { display: block; margin: 14px 0 6px; font-weight: 600; }
+.formulario input {
+  width: 100%;
+  padding: 13px;
+  font-size: 17px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: #fff;
+}
+.error { color: var(--rojo); font-weight: 600; }
+.acciones { margin-top: 22px; }
+
+[hidden] { display: none !important; }
+
+/* Logo del encabezado */
+.logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  vertical-align: middle;
+  margin-right: 10px;
+}
+
+/* Piezas que hay de cada producto */
+.existencia {
+  font-weight: 700;
+  margin: 0 12px;
+  white-space: nowrap;
+}
+.existencia.bajo { color: var(--rojo); }
+
+/* Que el texto del producto ocupe el espacio libre y empuje "Hay" y la flecha a la derecha */
+.lista li > div { flex: 1; }
+
+/* ---------- Pantalla de movimientos ---------- */
+.flotante-mov {
+  position: fixed;
+  left: 18px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  height: 62px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 31px;
+  background: #f3bd1b;          /* amarillo de la combi */
+  color: #6d3622;               /* café de la combi */
+  font-size: 17px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+}
+
+.formulario select {
+  width: 100%;
+  padding: 13px;
+  font-size: 17px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: #fff;
+}
+
+/* Los tres botones Entrada / Venta / Merma */
+.tipos { display: flex; gap: 8px; }
+.formulario .tipo { flex: 1; margin: 0; }
+.formulario .tipo input {         /* escondemos el circulito de radio */
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.tipo span {
+  display: block;
+  text-align: center;
+  padding: 14px 4px;
+  border: 2px solid var(--naranja);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--naranja);
+  font-weight: 600;
+}
+.tipo input:checked + span {      /* el que está elegido se rellena */
+  background: var(--naranja);
+  color: #fff;
+}
+
+.mensaje { color: #1e6b34; font-weight: 600; }
+
+/* ---------- Pantalla de conteo ---------- */
+.boton-encabezado {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 16px;
+  padding: 10px 16px;
+  border: 2px solid #f3bd1b;
+  border-radius: 10px;
+  background: transparent;
+  color: #f3bd1b;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.conteo { padding: calc(20px + env(safe-area-inset-top)) 16px 0; }
+.conteo h2 { margin-top: 0; }
+.ayuda { color: var(--gris); font-size: 14px; }
+
+.lista-conteo { list-style: none; margin: 0; padding: 0; }
+.fila-conteo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.fila-conteo .datos { flex: 1; }
+.fila-conteo .nombre { font-weight: 600; }
+.fila-conteo .esperado { color: var(--gris); font-size: 14px; }
+.fila-conteo input {
+  width: 84px;
+  padding: 12px;
+  font-size: 18px;
+  text-align: center;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+.dif { font-size: 14px; font-weight: 700; min-height: 18px; }
+.dif.ok { color: #1e6b34; }
+.dif.mal { color: var(--rojo); }
+
+/* Barra con los botones, siempre visible abajo */
+.barra-conteo {
+  position: sticky;
+  bottom: 0;
+  background: var(--fondo);
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+}
+.barra-conteo .acciones { display: flex; gap: 8px; margin-top: 8px; }
+.barra-conteo .boton { margin-bottom: 0; }
+
+/* ---------- Resultado del conteo: diferencias y botones para ajustar ---------- */
+.resultado {
+  background: #fff;
+  border: 2px solid var(--rojo);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.resultado h3 { margin: 0 0 6px; font-size: 18px; }
+.fila-resultado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--borde);
+}
+.fila-resultado .datos { flex: 1; }
+.fila-resultado .nombre { font-weight: 600; }
+.fila-resultado .detalle { color: var(--gris); font-size: 14px; }
+.boton-ajustar {
+  padding: 10px 14px;
+  border: 2px solid var(--naranja);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--naranja);
+  font-size: 15px;
+  font-weight: 700;
+}
+.boton-ajustar:disabled {
+  border-color: #1e6b34;
+  color: #1e6b34;
+  background: #eef7f0;
+}
+.resultado .boton { margin: 12px 0 0; }
+
+/* ---------- Botones del encabezado (Pedido y Conteo) ---------- */
+.botones-encabezado {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 16px;
+  display: flex;
+  gap: 8px;
+}
+.botones-encabezado .boton-encabezado { position: static; }

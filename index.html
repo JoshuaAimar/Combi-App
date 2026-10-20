@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover permite usar toda la pantalla del iPhone -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>La Combi</title>
+
+  <!-- Para que se pueda instalar -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#6d3622">
+
+  <!-- Ajustes específicos de iPhone (Safari) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="La Combi">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Encabezado fijo con el título y el buscador -->
+  <header class="encabezado">
+  <h1><img src="logo.png" alt="Logo de La Combi" class="logo">La Combi</h1>
+    <div class="botones-encabezado">
+      <button id="btnPedido" class="boton-encabezado">Pedido</button>
+      <button id="btnConteo" class="boton-encabezado">Conteo</button>
+    </div>  <p class="subtitulo">Productos</p>    <input id="buscador" type="search" placeholder="Buscar producto…" autocomplete="off">
+  </header>
+
+  <!-- Lista de productos (se llena desde app.js) -->
+  <main>
+    <p id="contador" class="contador"></p>
+    <ul id="lista" class="lista"></ul>
+    <p id="vacio" class="vacio" hidden>No se encontraron productos.</p>
+
+    <section class="respaldo">
+      <h2>Respaldo de datos</h2>
+      <p>Guarda una copia de tus productos para no perderlos si el teléfono se daña o se borra el navegador.</p>
+      <button id="btnExportar" class="boton secundario">Guardar respaldo</button>
+      <button id="btnImportar" class="boton secundario">Restaurar respaldo</button>
+      <input id="archivoRespaldo" type="file" accept="application/json,.json" hidden>
+    </section>
+  </main>
+
+  <!-- Botón flotante para agregar -->
+  <button id="btnAgregar" class="flotante" aria-label="Agregar producto">+</button>
+
+    <!-- Botón flotante para registrar movimientos -->
+  <button id="btnMovimiento" class="flotante-mov">Movimiento</button>
+
+  <!-- Pantalla del formulario (agregar / editar) -->
+  <div id="hoja" class="hoja" hidden>
+    <form id="formulario" class="formulario" novalidate>
+      <h2 id="tituloFormulario">Nuevo producto</h2>
+
+      <label for="campoNombre">Nombre</label>
+      <input id="campoNombre" type="text" autocomplete="off" required>
+
+      <label for="campoCompra">Precio de compra ($)</label>
+      <input id="campoCompra" type="number" inputmode="decimal" min="0" step="0.01" value="0">
+
+      <label for="campoVenta">Precio de venta ($)</label>
+      <input id="campoVenta" type="number" inputmode="decimal" min="0" step="0.01" value="0">
+
+      <label for="campoMinima">Existencia mínima (piezas)</label>
+      <input id="campoMinima" type="number" inputmode="numeric" min="0" step="1" value="0">
+
+      <p id="mensajeError" class="error" role="alert" hidden></p>
+
+      <div class="acciones">
+        <button type="submit" class="boton principal">Guardar</button>
+        <button type="button" id="btnCancelar" class="boton secundario">Cancelar</button>
+        <button type="button" id="btnEliminar" class="boton peligro" hidden>Eliminar producto</button>
+      </div>
+    </form>
+  </div>
+
+   <!-- Pantalla para registrar movimientos (entradas, ventas y mermas) -->
+  <div id="hojaMov" class="hoja" hidden>
+    <form id="formMov" class="formulario" novalidate>
+      <h2>Registrar movimiento</h2>
+
+      <label for="movProducto">Producto</label>
+      <select id="movProducto"></select>
+
+      <label>Tipo</label>
+      <div class="tipos">
+        <label class="tipo"><input type="radio" name="movTipo" value="entrada" checked><span>Entrada</span></label>
+        <label class="tipo"><input type="radio" name="movTipo" value="venta"><span>Venta</span></label>
+        <label class="tipo"><input type="radio" name="movTipo" value="merma"><span>Merma</span></label>
+      </div>
+
+      <label for="movCantidad">Cantidad (piezas)</label>
+      <input id="movCantidad" type="number" inputmode="numeric" min="1" step="1">
+
+      <p id="movMensaje" class="mensaje" role="status" hidden></p>
+      <p id="movError" class="error" role="alert" hidden></p>
+
+      <div class="acciones">
+        <button type="submit" class="boton principal">Guardar movimiento</button>
+        <button type="button" id="btnCerrarMov" class="boton secundario">Cerrar</button>
+      </div>
+    </form>
+  </div>
+    <!-- Pantalla del conteo físico -->
+  <div id="hojaConteo" class="hoja" hidden>
+    <div class="conteo">
+      <h2>Conteo físico</h2>
+      <p class="ayuda">Cuenta las piezas que hay y escríbelas. La app te muestra la diferencia contra lo que esperaba. Deja en blanco lo que no cuentes.</p>
+      <div id="resultadoConteo" class="resultado" hidden></div>
+      <ul id="listaConteo" class="lista-conteo"></ul>
+      <div class="barra-conteo">
+        <p id="conteoMensaje" class="mensaje" role="status" hidden></p>
+        <p id="conteoError" class="error" role="alert" hidden></p>
+        <div class="acciones">
+          <button type="button" id="btnGuardarConteo" class="boton principal">Guardar conteo</button>
+          <button type="button" id="btnCerrarConteo" class="boton secundario">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+    <!-- Pantalla del pedido sugerido -->
+  <div id="hojaPedido" class="hoja" hidden>
+    <div class="conteo">
+      <h2>Pedido sugerido</h2>
+      <p class="ayuda">Productos que están por debajo de su existencia mínima. Se sugiere pedir lo que falta para llegar a la mínima. Puedes cambiar las cantidades.</p>
+      <ul id="listaPedido" class="lista-conteo"></ul>
+      <p id="pedidoVacio" class="vacio" hidden>No hace falta pedir nada: todos los productos están en su mínima o arriba.</p>
+
+      <div class="barra-conteo">
+        <p id="pedidoMensaje" class="mensaje" role="status" hidden></p>
+        <div class="acciones">
+          <button type="button" id="btnCopiarPedido" class="boton principal">Copiar pedido</button>
+          <button type="button" id="btnCerrarPedido" class="boton secundario">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="datos.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
